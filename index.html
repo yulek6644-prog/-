@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Скан в Таблицу</title>
+  <meta name="description" content="Сканер штрих-кодов с отправкой в Google Таблицу">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Скан">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="status" id="statusBar">
+    <span class="dot" id="netDot"></span>
+    <span id="netText">…</span>
+    <span class="spacer"></span>
+    <span class="badge" id="pendingBadge" title="Ещё не отправлено в таблицу">⏳ 0</span>
+    <span class="badge ok" id="sentBadge" title="Отправлено в таблицу">✔ 0</span>
+  </header>
+
+  <main>
+    <!-- СКАНЕР -->
+    <section class="page active" id="page-scan">
+      <div class="camera" id="camera">
+        <video id="video" playsinline muted></video>
+        <div class="frame"><div class="laser"></div></div>
+        <div class="camera-msg" id="cameraMsg">Нажмите «Старт», чтобы включить камеру</div>
+        <div class="flash" id="flash"></div>
+      </div>
+
+      <div class="row">
+        <button class="btn primary big" id="btnStart">▶ Старт</button>
+        <button class="btn" id="btnTorch" hidden>🔦</button>
+      </div>
+
+      <div class="last" id="lastScan" hidden>
+        <div class="last-code" id="lastCode"></div>
+        <div class="last-meta" id="lastMeta"></div>
+      </div>
+
+      <div class="card">
+        <div class="grid2">
+          <label>Количество
+            <input type="number" id="qty" inputmode="numeric" min="1" step="1" value="1">
+          </label>
+          <label>Комментарий
+            <input type="text" id="note" placeholder="необязательно">
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="qtyReset" checked> Сбрасывать количество на 1 после скана</label>
+        <form class="manual" id="manualForm" autocomplete="off">
+          <input type="text" id="manualCode" placeholder="Ввести код вручную" inputmode="text">
+          <button class="btn" type="submit">Добавить</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ИСТОРИЯ -->
+    <section class="page" id="page-history">
+      <div class="row wrap">
+        <button class="btn primary" id="btnSync">⇪ Отправить сейчас</button>
+        <button class="btn" id="btnExport">⬇ CSV</button>
+        <button class="btn" id="btnClearSent">🧹 Убрать отправленные</button>
+      </div>
+      <p class="hint" id="syncInfo"></p>
+      <ul class="list" id="historyList"></ul>
+      <p class="hint center" id="historyEmpty">Сканов пока нет</p>
+    </section>
+
+    <!-- НАСТРОЙКИ -->
+    <section class="page" id="page-settings">
+      <div class="card">
+        <label>Адрес веб-приложения Google (…/exec)
+          <input type="url" id="setUrl" placeholder="https://script.google.com/macros/s/…/exec">
+        </label>
+        <label>Секретный ключ (если задан в скрипте)
+          <input type="text" id="setToken" autocomplete="off">
+        </label>
+        <label>Лист в таблице
+          <input type="text" id="setSheet" placeholder="Сканы">
+        </label>
+        <label>Имя устройства / сотрудника
+          <input type="text" id="setDevice" placeholder="например, Склад-1 или Иван">
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btnSave">Сохранить</button>
+          <button class="btn" id="btnTest">Проверить связь</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <label>Пауза перед повторным сканом того же кода, сек
+          <input type="number" id="setCooldown" min="0" step="0.5" inputmode="decimal">
+        </label>
+        <label class="check"><input type="checkbox" id="setBeep"> Звук при скане</label>
+        <label class="check"><input type="checkbox" id="setVibrate"> Вибрация при скане</label>
+        <label class="check"><input type="checkbox" id="setConfirm"> Спрашивать количество после каждого скана</label>
+      </div>
+
+      <div class="card">
+        <h3>Установить другим</h3>
+        <p class="hint">Ссылка откроет приложение уже с вашими настройками таблицы. Имя устройства каждый вводит своё.</p>
+        <div class="row">
+          <button class="btn" id="btnShare">📤 Поделиться ссылкой</button>
+        </div>
+        <textarea id="shareLink" readonly rows="3" hidden></textarea>
+      </div>
+
+      <p class="hint center" id="versionInfo"></p>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button class="tab active" data-page="scan">📷<span>Сканер</span></button>
+    <button class="tab" data-page="history">📋<span>История</span></button>
+    <button class="tab" data-page="settings">⚙️<span>Настройки</span></button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="vendor/barcode-detector.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
