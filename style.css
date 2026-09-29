@@ -161,6 +161,20 @@ input[type=text], input[type=url], input[type=number], textarea {
 }
 textarea { font-size: 13px; resize: none; }
 
+.seg { display: flex; gap: 8px; margin-bottom: 12px; }
+.seg-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 17px;
+  font-weight: 600;
+}
+.seg-btn.out.active { background: var(--err); border-color: var(--err); color: #fff; }
+.seg-btn.in.active { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+
 .grid2 { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
 .manual { display: flex; gap: 8px; }
 .manual input { margin-top: 0; }
