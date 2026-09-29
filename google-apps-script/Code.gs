@@ -50,7 +50,7 @@ var COL_NAME = 3;   // C
 var COL_SCAN_TIME = 9;   // I
 var COL_WRITE_TIME = 10; // J
 var COL_ID = 11;    // K
-var VERSION = 3;
+var VERSION = 4;
 
 function doGet(e) {
   var params = (e && e.parameter) || {};
@@ -125,9 +125,7 @@ function doPost(e) {
       sheet.getRange(start, COL_DATE, n, 1).setNumberFormat('yyyy-mm-dd');
       sheet.getRange(start, COL_SCAN_TIME, n, 2).setNumberFormat('yyyy-mm-dd h:mm:ss');
       sheet.getRange(start, 1, n, NUM_COLS).setValues(values);
-      // Наименование — та же формула, что и в старых строках: =VLOOKUP(A…;'номенклатура'!A:B;2;FALSE)
-      sheet.getRange(start, COL_NAME, n, 1)
-        .setFormulaR1C1("=VLOOKUP(R[0]C[-2],'" + NOMENCLATURE_SHEET + "'!C1:C2,2,FALSE)");
+      fillNameFormulas_(ss, sheet, lastRow, start, n);
       SpreadsheetApp.flush();
     }
 
@@ -152,6 +150,33 @@ function getSheet_(ss, name) {
     sheet.getRange(1, COL_ID).setValue(HEADERS[COL_ID - 1]);
   }
   return sheet;
+}
+
+// Наименование в колонке C: та же формула, что и в строках выше, =ВПР(A…;'номенклатура'!A:B;2;ЛОЖЬ).
+// Формулу копируем из последней рабочей строки: так она не зависит от языка таблицы
+// (в русской таблице аргументы разделяются «;», в английской — «,»).
+function fillNameFormulas_(ss, sheet, lastRow, start, n) {
+  var target = sheet.getRange(start, COL_NAME, n, 1);
+  if (lastRow >= 2) {
+    var from = Math.max(2, lastRow - 300);
+    var cells = sheet.getRange(from, COL_NAME, lastRow - from + 1, 1);
+    var formulas = cells.getFormulas();
+    var shown = cells.getDisplayValues();
+    for (var i = formulas.length - 1; i >= 0; i--) {
+      var f = formulas[i][0];
+      if (f && /VLOOKUP|ВПР/i.test(f) && shown[i][0] !== '#ERROR!') {
+        sheet.getRange(from + i, COL_NAME).copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+        return;
+      }
+    }
+  }
+  var locale = String(ss.getSpreadsheetLocale() || '');
+  var sep = /^(en|ja|zh|ko|th|he)/.test(locale) ? ',' : ';';
+  var list = [];
+  for (var r = 0; r < n; r++) {
+    list.push(['=VLOOKUP(A' + (start + r) + sep + "'" + NOMENCLATURE_SHEET + "'!A:B" + sep + '2' + sep + 'FALSE)']);
+  }
+  target.setFormulas(list);
 }
 
 // Последняя заполненная строка по колонке A (формулы или заметки в других колонках не сбивают).
