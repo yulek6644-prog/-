@@ -45,12 +45,16 @@
       </div>
 
       <div class="card">
+        <div class="seg" id="modeSeg">
+          <button type="button" class="seg-btn out" data-mode="out">− Расход</button>
+          <button type="button" class="seg-btn in" data-mode="in">+ Приход</button>
+        </div>
         <div class="grid2">
           <label>Количество
             <input type="number" id="qty" inputmode="numeric" min="1" step="1" value="1">
           </label>
           <label>Комментарий
-            <input type="text" id="note" placeholder="необязательно">
+            <input type="text" id="note" placeholder="например, П.907">
           </label>
         </div>
         <label class="check"><input type="checkbox" id="qtyReset" checked> Сбрасывать количество на 1 после скана</label>
@@ -83,7 +87,7 @@
           <input type="text" id="setToken" autocomplete="off">
         </label>
         <label>Лист в таблице
-          <input type="text" id="setSheet" placeholder="Сканы">
+          <input type="text" id="setSheet" placeholder="Данные">
         </label>
         <label>Имя устройства / сотрудника
           <input type="text" id="setDevice" placeholder="например, Склад-1 или Иван">

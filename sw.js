@@ -1,6 +1,6 @@
 /* Service worker: приложение открывается и сканирует даже без интернета.
  * При выпуске новой версии увеличьте CACHE. */
-var CACHE = 'scan-to-sheet-v1';
+var CACHE = 'scan-to-sheet-v2';
 var FILES = [
   './',
   'index.html',

@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.0.0';
+  var APP_VERSION = '1.1.0';
   var BATCH_SIZE = 100;
   var REQUEST_TIMEOUT_MS = 45000;
   var RETRY_MIN_MS = 5000;
@@ -20,13 +20,14 @@
   var DEFAULTS = {
     url: '',
     token: '',
-    sheet: 'Сканы',
+    sheet: 'Данные',
     device: '',
     cooldown: 2,
     beep: true,
     vibrate: true,
     confirmQty: false,
-    qtyReset: true
+    qtyReset: true,
+    mode: 'out'
   };
 
   function loadSettings() {
@@ -136,6 +137,16 @@
     return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU');
   }
 
+  function fmtQty(q) {
+    return (q > 0 ? '+' : '') + q;
+  }
+
+  function showMode() {
+    document.querySelectorAll('.seg-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-mode') === (settings.mode === 'in' ? 'in' : 'out'));
+    });
+  }
+
   var toastTimer = null;
   function toast(msg, isError) {
     var t = $('toast');
@@ -193,15 +204,17 @@
     lastCode = code;
     lastCodeAt = now;
 
-    var qty = parseFloat(String($('qty').value).replace(',', '.'));
-    if (!isFinite(qty) || qty <= 0) qty = 1;
+    var qty = Math.abs(parseFloat(String($('qty').value).replace(',', '.')));
+    if (!isFinite(qty) || qty === 0) qty = 1;
 
     if (settings.confirmQty) {
       var answer = window.prompt('Количество для ' + code, String(qty));
       if (answer === null) return Promise.resolve(); // отмена — не сохраняем
       var q = parseFloat(String(answer).replace(',', '.'));
-      if (isFinite(q) && q > 0) qty = q;
+      if (isFinite(q) && q !== 0) qty = Math.abs(q);
     }
+    // Расход записывается со знаком минус, приход — с плюсом (как на листе «Данные»).
+    if (settings.mode !== 'in') qty = -qty;
 
     var rec = {
       id: uuid(),
@@ -241,7 +254,7 @@
   function showLast(rec) {
     $('lastScan').hidden = false;
     $('lastCode').textContent = rec.code;
-    $('lastMeta').textContent = 'Кол-во: ' + rec.qty + (rec.format ? ' · ' + rec.format : '') +
+    $('lastMeta').textContent = (rec.qty < 0 ? 'Расход: ' : 'Приход: ') + fmtQty(rec.qty) + (rec.format ? ' · ' + rec.format : '') +
       ' · ' + new Date(rec.ts).toLocaleTimeString('ru-RU') + ' · сохранено, отправляется…';
   }
 
@@ -431,7 +444,7 @@
         body.className = 'body';
         var code = document.createElement('div');
         code.className = 'code';
-        code.textContent = r.code + (r.qty !== 1 ? '  × ' + r.qty : '');
+        code.textContent = r.code + '   ' + fmtQty(r.qty);
         var meta = document.createElement('div');
         meta.className = 'meta';
         meta.textContent = fmtTime(r.ts) + (r.format ? ' · ' + r.format : '') + ' · лист «' + r.sheet + '»' + (r.note ? ' · ' + r.note : '');
@@ -778,6 +791,10 @@
     };
 
     $('qtyReset').onchange = function () { settings.qtyReset = this.checked; saveSettings(); };
+    document.querySelectorAll('.seg-btn').forEach(function (b) {
+      b.onclick = function () { settings.mode = b.getAttribute('data-mode'); saveSettings(); showMode(); };
+    });
+    showMode();
 
     $('btnSync').onclick = function () { clearTimeout(syncTimer); retryDelay = RETRY_MIN_MS; sync(true); };
     $('btnExport').onclick = exportCsv;
