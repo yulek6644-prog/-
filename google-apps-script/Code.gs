@@ -30,6 +30,11 @@
 // Секретный ключ. Пусто = без проверки. Если задан — такой же нужно ввести в приложении.
 var SECRET = '';
 
+// ID таблицы — нужен, только если скрипт создан отдельно на script.google.com, а не из меню таблицы.
+// Берётся из адреса таблицы: docs.google.com/spreadsheets/d/ ЭТА_ЧАСТЬ /edit
+// Пусто = таблица, из которой открыт редактор скриптов.
+var SPREADSHEET_ID = '';
+
 // Лист по умолчанию, если приложение не прислало своё имя листа.
 var DEFAULT_SHEET = 'Данные';
 
@@ -52,7 +57,7 @@ function doGet(e) {
   if (SECRET && params.token !== SECRET) {
     return json_({ ok: false, error: 'Неверный секретный ключ' });
   }
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet_();
   return json_({ ok: true, app: 'scan-to-sheet', version: VERSION, spreadsheet: ss.getName() });
 }
 
@@ -67,7 +72,7 @@ function doPost(e) {
       return json_({ ok: false, error: 'Неверный секретный ключ' });
     }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getSpreadsheet_();
     var tz = ss.getSpreadsheetTimeZone();
     var rows = Array.isArray(data.rows) ? data.rows : [];
     var sheet = getSheet_(ss, data.sheet);
@@ -175,6 +180,11 @@ function serial_(date, tz) {
   var p = Utilities.formatDate(date, tz, 'yyyy,MM,dd,HH,mm,ss').split(',').map(Number);
   var ms = Date.UTC(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
   return (ms - Date.UTC(1899, 11, 30)) / 86400000;
+}
+
+function getSpreadsheet_() {
+  var id = String(SPREADSHEET_ID || '').trim();
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
 }
 
 function json_(obj) {
