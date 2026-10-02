@@ -15,7 +15,7 @@
  *
  * Формат строки — такой же, как у Scan-IT to Office на листе «Данные»:
  *   A  артикул (штрих-код)
- *   B  дата (yyyy-mm-dd)
+ *   B  дата (в том же формате, что и строки выше: с временем или без)
  *   C  наименование — формула ВПР по листу «номенклатура»
  *   D  количество (минус — расход, плюс — приход)
  *   E  комментарий (например, «П.907»)
@@ -47,10 +47,11 @@ var NUM_COLS = 11;
 var COL_CODE = 1;   // A
 var COL_DATE = 2;   // B
 var COL_NAME = 3;   // C
+var COL_QTY = 4;    // D
 var COL_SCAN_TIME = 9;   // I
 var COL_WRITE_TIME = 10; // J
 var COL_ID = 11;    // K
-var VERSION = 4;
+var VERSION = 5;
 
 function doGet(e) {
   var params = (e && e.parameter) || {};
@@ -79,6 +80,9 @@ function doPost(e) {
     var lastRow = lastRowInColumnA_(sheet);
     var known = existingIds_(sheet, lastRow);
     var now = serial_(new Date(), tz);
+    // Формат даты и количества берём из строк выше: где-то дата без времени (2026-09-29),
+    // где-то со временем (29.09.2026 8:36:04).
+    var look = rowLook_(sheet, lastRow);
 
     var saved = [];
     var duplicates = [];
@@ -99,7 +103,7 @@ function doPost(e) {
       var scanTime = serial_(ts, tz);
       values.push([
         String(r.code),              // A артикул
-        Math.floor(scanTime),        // B дата без времени
+        look.withTime ? scanTime : Math.floor(scanTime), // B дата (со временем, если так в таблице)
         '',                          // C формула ставится ниже
         qty,                         // D количество
         String(r.note || ''),        // E комментарий
@@ -122,7 +126,8 @@ function doPost(e) {
       // Артикул и ID как текст: иначе длинные коды превращаются в 4,6E+12 и теряются ведущие нули.
       sheet.getRange(start, COL_CODE, n, 1).setNumberFormat('@');
       sheet.getRange(start, COL_ID, n, 1).setNumberFormat('@');
-      sheet.getRange(start, COL_DATE, n, 1).setNumberFormat('yyyy-mm-dd');
+      sheet.getRange(start, COL_DATE, n, 1).setNumberFormat(look.dateFormat);
+      if (look.qtyFormat) sheet.getRange(start, COL_QTY, n, 1).setNumberFormat(look.qtyFormat);
       sheet.getRange(start, COL_SCAN_TIME, n, 2).setNumberFormat('yyyy-mm-dd h:mm:ss');
       sheet.getRange(start, 1, n, NUM_COLS).setValues(values);
       fillNameFormulas_(ss, sheet, lastRow, start, n);
@@ -150,6 +155,31 @@ function getSheet_(ss, name) {
     sheet.getRange(1, COL_ID).setValue(HEADERS[COL_ID - 1]);
   }
   return sheet;
+}
+
+// Как оформлены последние строки: есть ли время в дате и какой формат у количества.
+function rowLook_(sheet, lastRow) {
+  var look = { withTime: false, dateFormat: 'yyyy-mm-dd', qtyFormat: '' };
+  if (lastRow < 2) return look;
+  var from = Math.max(2, lastRow - 300);
+  var n = lastRow - from + 1;
+  var dates = sheet.getRange(from, COL_DATE, n, 1);
+  var dateValues = dates.getValues();
+  var dateFormats = dates.getNumberFormats();
+  var qtyFormats = sheet.getRange(from, COL_QTY, n, 1).getNumberFormats();
+  for (var i = n - 1; i >= 0; i--) {
+    var v = dateValues[i][0];
+    if (Object.prototype.toString.call(v) === '[object Date]' || typeof v === 'number') {
+      var f = String(dateFormats[i][0] || '');
+      if (f) {
+        look.dateFormat = f;
+        look.withTime = /h/i.test(f);
+      }
+      look.qtyFormat = String(qtyFormats[i][0] || '');
+      break;
+    }
+  }
+  return look;
 }
 
 // Наименование в колонке C: та же формула, что и в строках выше, =ВПР(A…;'номенклатура'!A:B;2;ЛОЖЬ).
