@@ -51,7 +51,7 @@ var COL_QTY = 4;    // D
 var COL_SCAN_TIME = 9;   // I
 var COL_WRITE_TIME = 10; // J
 var COL_ID = 11;    // K
-var VERSION = 5;
+var VERSION = 6;
 
 function doGet(e) {
   var params = (e && e.parameter) || {};
@@ -102,7 +102,7 @@ function doPost(e) {
       if (!isFinite(qty) || qty === 0) qty = 1;
       var scanTime = serial_(ts, tz);
       values.push([
-        String(r.code),              // A артикул
+        cleanCode_(r.code),          // A артикул
         look.withTime ? scanTime : Math.floor(scanTime), // B дата (со временем, если так в таблице)
         '',                          // C формула ставится ниже
         qty,                         // D количество
@@ -240,6 +240,11 @@ function serial_(date, tz) {
 function getSpreadsheet_() {
   var id = String(SPREADSHEET_ID || '').trim();
   return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+}
+
+// Убираем служебный префикс штрих-кода вида «]C1» (GS1-128) и невидимые символы.
+function cleanCode_(raw) {
+  return String(raw).replace(/[\u0000-\u001f\u007f]+/g, '').trim().replace(/^\][A-Za-z][0-9A-Za-z]/, '').trim();
 }
 
 function json_(obj) {
