@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.1.0';
+  var APP_VERSION = '1.2.0';
   var BATCH_SIZE = 100;
   var REQUEST_TIMEOUT_MS = 45000;
   var RETRY_MIN_MS = 5000;
@@ -27,7 +27,8 @@
     vibrate: true,
     confirmQty: false,
     qtyReset: true,
-    mode: 'out'
+    mode: 'out',
+    trimStart: 0
   };
 
   function loadSettings() {
@@ -193,7 +194,7 @@
   var persistAsked = false;
 
   function addScan(code, format, source) {
-    code = String(code || '').replace(/[\r\n\t]+/g, '').trim();
+    code = cleanCode(code, source);
     if (!code) return Promise.resolve();
 
     var now = Date.now();
@@ -249,6 +250,17 @@
       vibrate([200, 100, 200]);
       toast('Не удалось сохранить скан на телефоне: ' + (err && err.message || err), true);
     });
+  }
+
+  // Некоторые штрих-коды (GS1-128 и др.) отдают в начале служебный префикс вида «]C1»
+  // и невидимые управляющие символы — убираем их. Плюс по настройке можно отрезать
+  // N символов в начале, если на этикетках перед артикулом всегда стоит лишнее.
+  function cleanCode(raw, source) {
+    var code = String(raw || '').replace(/[\u0000-\u001f\u007f]+/g, '').trim();
+    code = code.replace(/^\][A-Za-z][0-9A-Za-z]/, '');
+    var n = Math.max(0, parseInt(settings.trimStart, 10) || 0);
+    if (source === 'camera' && n > 0 && code.length > n) code = code.slice(n);
+    return code.trim();
   }
 
   function showLast(rec) {
@@ -667,6 +679,7 @@
     $('setSheet').value = settings.sheet;
     $('setDevice').value = settings.device;
     $('setCooldown').value = settings.cooldown;
+    $('setTrim').value = settings.trimStart || 0;
     $('setBeep').checked = !!settings.beep;
     $('setVibrate').checked = !!settings.vibrate;
     $('setConfirm').checked = !!settings.confirmQty;
@@ -683,6 +696,8 @@
     settings.beep = $('setBeep').checked;
     settings.vibrate = $('setVibrate').checked;
     settings.confirmQty = $('setConfirm').checked;
+    var tr = parseInt($('setTrim').value, 10);
+    settings.trimStart = isFinite(tr) && tr > 0 ? Math.min(tr, 20) : 0;
   }
 
   function testConnection() {
@@ -715,7 +730,7 @@
 
   function shareLink() {
     readSettingsForm();
-    var cfg = { url: settings.url, token: settings.token, sheet: settings.sheet };
+    var cfg = { url: settings.url, token: settings.token, sheet: settings.sheet, trimStart: settings.trimStart || 0 };
     var link = location.origin + location.pathname + '#cfg=' + b64urlEncode(JSON.stringify(cfg));
     var ta = $('shareLink');
     ta.value = link;
@@ -738,6 +753,7 @@
         settings.url = String(cfg.url);
         settings.token = String(cfg.token || '');
         settings.sheet = String(cfg.sheet || DEFAULTS.sheet);
+        settings.trimStart = Math.max(0, parseInt(cfg.trimStart, 10) || 0);
         saveSettings();
         if (!settings.device) {
           var name = prompt('Как подписывать сканы с этого телефона? (имя или номер устройства)', '');
