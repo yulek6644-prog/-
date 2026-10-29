@@ -28,7 +28,8 @@
     confirmQty: false,
     qtyReset: true,
     mode: 'out',
-    trimStart: 0
+    trimStart: 0,
+    forceZxing: false
   };
 
   function loadSettings() {
@@ -534,6 +535,8 @@
   var torchOn = false;
   var wakeLock = null;
   var resumeOnShow = false;
+  var detectorNative = false;
+  var detectErrors = 0;
 
   var FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar', 'itf',
     'qr_code', 'data_matrix', 'pdf417', 'aztec'];
@@ -559,11 +562,13 @@
     }
 
     // Встроенный распознаватель Android/Chrome — быстрее. Иначе — ZXing (iPhone и др.).
-    if ('BarcodeDetector' in window && window.BarcodeDetector.getSupportedFormats) {
+    // На некоторых телефонах встроенный есть, но не работает — тогда включают ZXing в настройках.
+    if (!settings.forceZxing && 'BarcodeDetector' in window && window.BarcodeDetector.getSupportedFormats) {
       return window.BarcodeDetector.getSupportedFormats().then(function (sup) {
         var fmts = FORMATS.filter(function (f) { return sup.indexOf(f) >= 0; });
         if (fmts.indexOf('ean_13') < 0 || fmts.indexOf('code_128') < 0) return useZxing();
         detector = new window.BarcodeDetector({ formats: fmts });
+        detectorNative = true;
         return detector;
       }).catch(useZxing);
     }
@@ -586,8 +591,8 @@
         audio: false,
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         }
       });
     }).then(function (s) {
@@ -657,14 +662,26 @@
   function loop() {
     if (!scanning) return;
     var video = $('video');
-    if (!detectBusy && video.readyState >= 2 && video.videoWidth) {
+    if (!detectBusy && detector && video.readyState >= 2 && video.videoWidth) {
       detectBusy = true;
       detector.detect(video).then(function (codes) {
+        detectErrors = 0;
         if (codes && codes.length && scanning) {
           var c = codes[0];
           return addScan(c.rawValue, c.format, 'camera');
         }
-      }).catch(function () { /* пропускаем неудачный кадр */ }).finally(function () {
+      }).catch(function () {
+        // Отдельный неудачный кадр пропускаем. Если встроенный распознаватель
+        // ошибается постоянно — он на этом телефоне не работает, переходим на ZXing.
+        if (detectorNative && ++detectErrors >= 10) {
+          detector = null;
+          detectorNative = false;
+          detectErrors = 0;
+          settings.forceZxing = true;
+          saveSettings();
+          return createDetector();
+        }
+      }).finally(function () {
         detectBusy = false;
       });
     }
@@ -683,6 +700,7 @@
     $('setBeep').checked = !!settings.beep;
     $('setVibrate').checked = !!settings.vibrate;
     $('setConfirm').checked = !!settings.confirmQty;
+    $('setZxing').checked = !!settings.forceZxing;
     $('qtyReset').checked = !!settings.qtyReset;
   }
 
@@ -696,6 +714,11 @@
     settings.beep = $('setBeep').checked;
     settings.vibrate = $('setVibrate').checked;
     settings.confirmQty = $('setConfirm').checked;
+    if (settings.forceZxing !== $('setZxing').checked) {
+      settings.forceZxing = $('setZxing').checked;
+      detector = null; // новый распознаватель подхватится при следующем «Старт»
+      detectorNative = false;
+    }
     var tr = parseInt($('setTrim').value, 10);
     settings.trimStart = isFinite(tr) && tr > 0 ? Math.min(tr, 20) : 0;
   }
